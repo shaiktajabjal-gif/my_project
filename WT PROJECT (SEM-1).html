@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>OBE Mapping Tool</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{--bg:#f7f9fc;--card:#fff;--accent:#1565c0;--muted:#666}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:0;background:var(--bg);color:#222}
+    header{background:linear-gradient(90deg,#0d47a1,#1565c0);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
+    header h1{margin:0;font-size:18px}
+    nav button{background:transparent;border:1px solid rgba(255,255,255,0.12);color:#fff;padding:8px 12px;margin-left:8px;border-radius:6px;cursor:pointer}
+    main{padding:20px;max-width:1100px;margin:18px auto}
+    .card{background:var(--card);border-radius:10px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(20,30,50,0.06)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    label{font-size:13px;color:var(--muted)}
+    input[type="text"]{padding:8px;border-radius:6px;border:1px solid #ddd}
+    button.btn{background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border:1px solid #eee;text-align:center}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    .small{font-size:13px;padding:6px 8px}
+    .danger{background:#e53935}
+    .muted{color:var(--muted);font-size:13px}
+    .flex-between{display:flex;justify-content:space-between;align-items:center}
+    select{padding:6px;border-radius:6px;border:1px solid #ddd}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>OBE Mapping Tool</h1>
+  <nav>
+    <button id="nav-home">Home</button>
+    <button id="nav-add">Add CO/PO Mapping</button>
+    <button id="nav-view">View Mapping Table</button>
+    <button id="nav-about">About</button>
+  </nav>
+</header>
+
+<main>
+  <section id="page-home" class="card">
+    <h2>Welcome</h2>
+    <p class="muted">Quick tool to create and export CO-PO mapping sheets, compute CO-PO matrix, visualize attainment, and save locally (LocalStorage).</p>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="goto-add">Start mapping</button>
+      <button class="btn" id="load-sample">Load sample</button>
+      <button class="small" id="clear-all">Clear all data</button>
+      <div class="card" style="margin-top:20px; background:#e3f2fd; padding:15px; border-radius:10px;">
+  <h3 style="margin:0;">Team Members</h3>
+  <ul style="margin-top:8px; padding-left:18px; line-height:1.6;">
+    <li>1. SK. TAJ ABJAL</li>
+    <li>2. RAJOLU KUSUMA</li>
+    <li>3. CH. GANGA BHAVANI</li>
+    <li>4. NITISH DUBEY</li>
+  </ul>
+</div>
+
+    </div>
+  </section>
+
+  <section id="page-add" class="card" style="display:none">
+    <div class="flex-between">
+      <h2>Add / Edit COs and POs</h2>
+      <div class="controls">
+        <button class="small" id="autosave">Save to LocalStorage</button>
+        <button class="small" id="export-json">Export JSON</button>
+        <input type="file" id="import-file" accept=".json" style="display:none"/>
+        <button class="small" id="import-json">Import JSON</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="grid">
+      <div class="card">
+        <h3>Course Outcomes (COs)</h3>
+        <div style="margin-bottom:8px" class="row">
+          <input id="new-co" placeholder="CO name (e.g., CO1)" />
+          <input id="new-co-desc" placeholder="Short description (optional)" />
+          <button id="add-co" class="btn">Add CO</button>
+        </div>
+        <ul id="co-list"></ul>
+      </div>
+
+      <div class="card">
+        <h3>Program Outcomes (POs)</h3>
+        <div style="margin-bottom:8px" class="row">
+          <input id="new-po" placeholder="PO name (e.g., PO1)" />
+          <input id="new-po-desc" placeholder="Short description (optional)" />
+          <button id="add-po" class="btn">Add PO</button>
+        </div>
+        <ul id="po-list"></ul>
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="card">
+      <h3>Mapping (CO × PO)</h3>
+      <p class="muted">Select mapping strength: 0 (no relation), 1 (low), 2 (medium), 3 (high). Changes auto-update matrix and charts below.</p>
+      <div id="mapping-area"></div>
+    </div>
+
+    <div style="margin-top:12px" class="card">
+      <div class="flex-between">
+        <div>
+          <h3>Settings</h3>
+          <p class="muted">Attainment formula (default): For each CO: <code>CO_attainment = 100 × (sum(mapping_values for that CO) / (3 × number_of_POs))</code></p>
+        </div>
+        <div>
+          <label>Max mapping value:
+            <select id="max-map-value">
+              <option value="3" selected>3</option>
+              <option value="2">2</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="page-view" class="card" style="display:none">
+    <div class="flex-between">
+      <h2>Matrix & Visuals</h2>
+      <div class="controls">
+        <button id="download-csv" class="small">Export CSV</button>
+        <button id="download-xlsx" class="small">Export Excel</button>
+        <button id="download-json" class="small">Export JSON</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="card">
+      <h3>CO × PO Matrix</h3>
+      <div id="matrix-area"></div>
+    </div>
+
+    <div class="grid" style="margin-top:12px">
+      <div class="card">
+        <h3>CO Attainment (Bar)</h3>
+        <canvas id="chart-co" height="220"></canvas>
+      </div>
+      <div class="card">
+        <h3>PO Distribution (Pie)</h3>
+        <canvas id="chart-po" height="220"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section id="page-about" class="card" style="display:none">
+    <h2>About</h2>
+    <p class="muted">OBE Mapping Tool — lightweight front-end app. Data is stored in your browser's localStorage. You can export Excel/CSV/JSON and customize the attainment formula in code.</p>
+    <h3>Notes for NBA / NAAC</h3>
+    <ul>
+      <li>NBA/NAAC often expects: CO list, PO list, CO–PO mapping matrix, attainment values per CO, and evidence/document links. Use the <strong>Export Excel</strong> to create a submission sheet and adjust headers to match your institute's template.</li>
+      <li>If you need a specific template, paste it here and I can adapt the exporter to that format.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+/*
+  OBE Mapping Tool - Single file
+  Features:
+   - Add / remove COs and POs
+   - Mapping table (select 0..maxMap)
+   - Auto-calc matrix and CO attainment (simple formula)
+   - Charts using Chart.js
+   - Save/load to localStorage, import/export JSON, CSV, XLSX
+*/
+
+const KEY = 'obe_mapping_v1';
+let state = {
+  cos: [], // {id, name, desc}
+  pos: [], // {id, name, desc}
+  mapping: {}, // mapping["COid_POid"] = value (0..max)
+  maxMap: 3
+};
+
+// DOM refs
+const pages = {
+  home: document.getElementById('page-home'),
+  add: document.getElementById('page-add'),
+  view: document.getElementById('page-view'),
+  about: document.getElementById('page-about'),
+};
+
+function showPage(name){
+  Object.values(pages).forEach(p=>p.style.display='none');
+  pages[name].style.display='block';
+}
+document.getElementById('nav-home').onclick = ()=>showPage('home');
+document.getElementById('nav-add').onclick = ()=>showPage('add');
+document.getElementById('nav-view').onclick = ()=>showPage('view');
+document.getElementById('nav-about').onclick = ()=>showPage('about');
+document.getElementById('goto-add').onclick = ()=>showPage('add');
+
+// load saved state
+function loadState(){
+  const raw = localStorage.getItem(KEY);
+  if(raw){
+    try{
+      const parsed = JSON.parse(raw);
+      state = {...state, ...parsed};
+      // ensure mapping object
+      state.mapping = state.mapping || {};
+    }catch(e){
+      console.warn('Could not parse saved state', e);
+    }
+  }
+}
+function saveState(){
+  localStorage.setItem(KEY, JSON.stringify(state));
+  alert('Saved to localStorage');
+}
+
+// helpers
+function uid(prefix='id'){return prefix + '_' + Math.random().toString(36).slice(2,9);}
+
+// --- UI: CO / PO lists ---
+const coList = document.getElementById('co-list');
+const poList = document.getElementById('po-list');
+const mappingArea = document.getElementById('mapping-area');
+
+function renderLists(){
+  coList.innerHTML = '';
+  poList.innerHTML = '';
+  state.cos.forEach(co=>{
+    const li = document.createElement('li');
+    li.innerHTML = `<strong>${co.name}</strong> — <span class="muted">${co.desc||''}</span>
+      <button class="small" data-id="${co.id}" onclick="editCO(this)">Edit</button>
+      <button class="small danger" data-id="${co.id}" onclick="removeCO(this)">Delete</button>`;
+    coList.appendChild(li);
+  });
+  state.pos.forEach(po=>{
+    const li = document.createElement('li');
+    li.innerHTML = `<strong>${po.name}</strong> — <span class="muted">${po.desc||''}</span>
+      <button class="small" data-id="${po.id}" onclick="editPO(this)">Edit</button>
+      <button class="small danger" data-id="${po.id}" onclick="removePO(this)">Delete</button>`;
+    poList.appendChild(li);
+  });
+  renderMappingTable();
+}
+
+// Add CO / PO
+document.getElementById('add-co').onclick = ()=>{
+  const name = document.getElementById('new-co').value.trim();
+  const desc = document.getElementById('new-co-desc').value.trim();
+  if(!name){alert('Enter CO name');return;}
+  state.cos.push({id: uid('CO'), name, desc});
+  document.getElementById('new-co').value='';document.getElementById('new-co-desc').value='';
+  renderLists();
+  autoSaveIfNeeded();
+};
+document.getElementById('add-po').onclick = ()=>{
+  const name = document.getElementById('new-po').value.trim();
+  const desc = document.getElementById('new-po-desc').value.trim();
+  if(!name){alert('Enter PO name');return;}
+  state.pos.push({id: uid('PO'), name, desc});
+  document.getElementById('new-po').value='';document.getElementById('new-po-desc').value='';
+  renderLists();
+  autoSaveIfNeeded();
+};
+
+// Edit / remove functions exposed to inline onclick
+window.editCO = function(btn){
+  const id = btn.getAttribute('data-id');
+  const co = state.cos.find(c=>c.id===id);
+  if(!co) return;
+  const n = prompt('Edit CO name', co.name);
+  if(n===null) return;
+  co.name = n.trim() || co.name;
+  co.desc = prompt('Short description', co.desc||'') || co.desc;
+  renderLists(); autoSaveIfNeeded();
+};
+window.editPO = function(btn){
+  const id = btn.getAttribute('data-id');
+  const po = state.pos.find(p=>p.id===id);
+  if(!po) return;
+  const n = prompt('Edit PO name', po.name);
+  if(n===null) return;
+  po.name = n.trim() || po.name;
+  po.desc = prompt('Short description', po.desc||'') || po.desc;
+  renderLists(); autoSaveIfNeeded();
+};
+window.removeCO = function(btn){
+  const id = btn.getAttribute('data-id');
+  if(!confirm('Delete this CO?')) return;
+  state.cos = state.cos.filter(c=>c.id!==id);
+  // remove mappings related to CO
+  Object.keys(state.mapping).forEach(k=>{ if(k.startsWith(id+'_')) delete state.mapping[k]; });
+  renderLists(); updateMatrixAndCharts(); autoSaveIfNeeded();
+};
+window.removePO = function(btn){
+  const id = btn.getAttribute('data-id');
+  if(!confirm('Delete this PO?')) return;
+  state.pos = state.pos.filter(p=>p.id!==id);
+  Object.keys(state.mapping).forEach(k=>{ if(k.includes('_'+id)) delete state.mapping[k]; });
+  renderLists(); updateMatrixAndCharts(); autoSaveIfNeeded();
+};
+
+// mapping table
+function renderMappingTable(){
+  mappingArea.innerHTML = '';
+  if(state.cos.length===0 || state.pos.length===0){
+    mappingArea.innerHTML = '<p class="muted">Add at least one CO and one PO to start mapping.</p>'; return;
+  }
+  const tbl = document.createElement('table');
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  headRow.innerHTML = '<th>CO \\ PO</th>' + state.pos.map(p=>`<th>${p.name}</th>`).join('');
+  thead.appendChild(headRow);
+  tbl.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  state.cos.forEach(co=>{
+    const tr = document.createElement('tr');
+    const th = document.createElement('th');
+    th.textContent = co.name;
+    tr.appendChild(th);
+    state.pos.forEach(po=>{
+      const td = document.createElement('td');
+      const key = `${co.id}_${po.id}`;
+      const val = state.mapping[key] ?? 0;
+      const sel = document.createElement('select');
+      sel.dataset.key = key;
+      sel.onchange = (e)=>{ state.mapping[key] = Number(e.target.value); updateMatrixAndCharts(); autoSaveIfNeeded(); };
+      for(let i=0;i<=state.maxMap;i++){
+        const opt = document.createElement('option'); opt.value = i; opt.text = i;
+        if(i===val) opt.selected=true;
+        sel.appendChild(opt);
+      }
+      td.appendChild(sel);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);
+  mappingArea.appendChild(tbl);
+  updateMatrixAndCharts();
+}
+
+// --- Matrix & Attainment calculation ---
+const matrixArea = document.getElementById('matrix-area');
+let coChart = null, poChart = null;
+
+function computeMatrix(){
+  // returns: matrix (rows COs, cols POs), rowSums, colSums
+  const matrix = [];
+  const rowSums = [];
+  const colSums = Array(state.pos.length).fill(0);
+  state.cos.forEach((co, i)=>{
+    const row = [];
+    let rowSum=0;
+    state.pos.forEach((po, j)=>{
+      const val = Number(state.mapping[`${co.id}_${po.id}`] ?? 0);
+      row.push(val);
+      rowSum += val;
+      colSums[j] += val;
+    });
+    matrix.push(row);
+    rowSums.push(rowSum);
+  });
+  return {matrix, rowSums, colSums};
+}
+
+function computeCOAttainment(){
+  // Default formula: attainment% = 100 * (sum(mapping values for CO) / (maxMap * numPOs))
+  const {rowSums} = computeMatrix();
+  const numPOs = state.pos.length || 1;
+  const denom = state.maxMap * numPOs;
+  return state.cos.map((co, i)=>{
+    const score = denom ? (rowSums[i] / denom) * 100 : 0;
+    return Math.round(score*100)/100; // two decimals
+  });
+}
+
+function renderMatrixTable(){
+  matrixArea.innerHTML = '';
+  if(state.cos.length===0 || state.pos.length===0){ matrixArea.innerHTML='<p class="muted">No matrix to show.</p>'; return; }
+  const tbl = document.createElement('table');
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  headRow.innerHTML = '<th>CO \\ PO</th>' + state.pos.map(p=>`<th>${p.name}</th>`).join('') + '<th>CO Sum</th><th>Attainment (%)</th>';
+  thead.appendChild(headRow);
+  tbl.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  const {matrix, rowSums, colSums} = computeMatrix();
+  const coAtt = computeCOAttainment();
+  state.cos.forEach((co,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<th>${co.name}</th>` + matrix[i].map(v=>`<td>${v}</td>`).join('') + `<td>${rowSums[i]}</td><td>${coAtt[i]}</td>`;
+    tbody.appendChild(tr);
+  });
+  // footer with PO sums
+  const foot = document.createElement('tr');
+  foot.innerHTML = `<th>PO Sum</th>` + colSums.map(s=>`<td>${s}</td>`).join('') + `<td>-</td><td>-</td>`;
+  tbody.appendChild(foot);
+  tbl.appendChild(tbody);
+  matrixArea.appendChild(tbl);
+}
+
+// --- Charts ---
+function updateCharts(){
+  const labelsCO = state.cos.map(c=>c.name);
+  const labelsPO = state.pos.map(p=>p.name);
+  const coAtt = computeCOAttainment();
+  const {colSums} = computeMatrix();
+
+  // CO bar
+  const ctxCo = document.getElementById('chart-co').getContext('2d');
+  if(coChart) coChart.destroy();
+  coChart = new Chart(ctxCo, {
+    type: 'bar',
+    data: {
+      labels: labelsCO,
+      datasets: [{label: 'CO Attainment (%)', data: coAtt}]
+    },
+    options: {responsive:true,scales:{y:{beginAtZero:true,max:100}}}
+  });
+
+  // PO pie
+  const ctxPo = document.getElementById('chart-po').getContext('2d');
+  if(poChart) poChart.destroy();
+  poChart = new Chart(ctxPo, {
+    type: 'pie',
+    data: {
+      labels: labelsPO,
+      datasets: [{label: 'PO Coverage', data: colSums}]
+    },
+    options: {responsive:true}
+  });
+}
+
+function updateMatrixAndCharts(){
+  renderMatrixTable();
+  updateCharts();
+}
+
+// Exports
+function buildExportTable(){
+  // Returns a 2D array representing CSV/XLSX sheet
+  const header = ['CO/PO'].concat(state.pos.map(p=>p.name)).concat(['CO Sum','Attainment (%)']);
+  const {matrix, rowSums} = computeMatrix();
+  const coAtt = computeCOAttainment();
+  const sheet = [header];
+  state.cos.forEach((co,i)=>{
+    const row = [co.name].concat(matrix[i]).concat([rowSums[i], coAtt[i]]);
+    sheet.push(row);
+  });
+  // footer of PO sums
+  const {colSums} = computeMatrix();
+  const footer = ['PO Sum'].concat(colSums).concat(['-','-']);
+  sheet.push(footer);
+  return sheet;
+}
+
+document.getElementById('download-csv').onclick = ()=>{
+  const arr = buildExportTable();
+  const csv = arr.map(r=>r.map(cell=>`"${String(cell||'')}".replace(/"/g,'""')`).join(',')).join('\n');
+  // simpler proper quoting:
+  const csv2 = arr.map(r=>r.map(c=> `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv2], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'obe_mapping.csv'; document.body.appendChild(a); a.click(); a.remove();
+};
+
+document.getElementById('download-json').onclick = ()=>{
+  const exportObj = {...state, computed: {coAttainment: computeCOAttainment(), matrix: computeMatrix()}};
+  const blob = new Blob([JSON.stringify(exportObj, null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'obe_mapping.json'; a.click();
+};
+
+document.getElementById('download-xlsx').onclick = ()=>{
+  const arr = buildExportTable();
+  const ws = XLSX.utils.aoa_to_sheet(arr);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'CO-PO Mapping');
+  XLSX.writeFile(wb, 'obe_mapping.xlsx');
+};
+
+// JSON import/export controls
+document.getElementById('export-json').onclick = ()=>{
+  const exportObj = {...state};
+  const blob = new Blob([JSON.stringify(exportObj, null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'obe_mapping_export.json'; a.click();
+};
+
+document.getElementById('import-json').onclick = ()=>document.getElementById('import-file').click();
+document.getElementById('import-file').onchange = function(e){
+  const f = e.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try{
+      const obj = JSON.parse(ev.target.result);
+      if(!confirm('Importing will overwrite current workspace. Continue?')) return;
+      state = {...state, ...obj};
+      state.mapping = state.mapping || {};
+      // ensure numeric maxMap
+      state.maxMap = Number(state.maxMap) || 3;
+      document.getElementById('max-map-value').value = String(state.maxMap);
+      renderLists();
+      updateMatrixAndCharts();
+      saveState();
+      alert('Imported.');
+    }catch(err){ alert('Invalid JSON'); }
+  };
+  reader.readAsText(f);
+};
+
+// Save/load
+document.getElementById('autosave').onclick = saveState;
+document.getElementById('clear-all').onclick = ()=>{
+  if(!confirm('Clear all stored data?')) return;
+  localStorage.removeItem(KEY); state = {cos:[], pos:[], mapping:{}, maxMap:3}; renderLists(); updateMatrixAndCharts();
+};
+
+// settings
+document.getElementById('max-map-value').onchange = function(e){
+  state.maxMap = Number(e.target.value);
+  // update all selects to reflect new range; clamp values >max to max
+  Object.keys(state.mapping).forEach(k=>{ if(state.mapping[k] > state.maxMap) state.mapping[k] = state.maxMap;});
+  renderMappingTable();
+  autoSaveIfNeeded();
+};
+
+// autoload sample
+document.getElementById('load-sample').onclick = ()=>{
+  state.cos = [{id:'CO_1',name:'CO1',desc:'Understand basics'},{id:'CO_2',name:'CO2',desc:'Apply knowledge'}];
+  state.pos = [{id:'PO_1',name:'PO1'},{id:'PO_2',name:'PO2'},{id:'PO_3',name:'PO3'}];
+  state.mapping = {'CO_1_PO_1':3,'CO_1_PO_2':1,'CO_1_PO_3':0,'CO_2_PO_1':2,'CO_2_PO_2':3,'CO_2_PO_3':1};
+  state.maxMap = 3;
+  document.getElementById('max-map-value').value='3';
+  renderLists();
+  updateMatrixAndCharts();
+  saveState();
+};
+
+// small autosave trigger to persist changes without spamming user
+let autosaveTimer = null;
+function autoSaveIfNeeded(){
+  if(autosaveTimer) clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(()=>{ localStorage.setItem(KEY, JSON.stringify(state)); autosaveTimer = null; }, 600);
+}
+
+// on load
+loadState();
+renderLists();
+updateMatrixAndCharts();
+
+// expose save to window for debug
+window.saveOBE = saveState;
+
+// small UI niceties: initial page
+showPage('home');
+
+</script>
+</body>
+</html>
+
